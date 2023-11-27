@@ -15,10 +15,9 @@
 package chi
 
 import (
+	"github.com/altinity/queue"
 	coreV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/altinity/queue"
 
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )

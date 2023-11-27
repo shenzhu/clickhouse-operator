@@ -52,7 +52,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 		return c.onStatefulSetCreateFailed(ctx, host)
 	}
 
-	log.V(2).M(host).F().Info("Target generation reached, StatefulSet created successfully")
+	log.V(1).M(host).F().Info("Target generation reached, StatefulSet created successfully")
 	return nil
 }
 

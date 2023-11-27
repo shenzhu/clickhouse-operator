@@ -193,6 +193,8 @@ func (w *worker) run() {
 }
 
 func (w *worker) processReconcileCHI(ctx context.Context, cmd *ReconcileCHI) error {
+	log.V(1).F().Info("Received ReconcileCHI: %v", cmd)
+
 	switch cmd.cmd {
 	case reconcileAdd:
 		return w.updateCHI(ctx, nil, cmd.new)
@@ -253,6 +255,8 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 }
 
 func (w *worker) processReconcilePod(ctx context.Context, cmd *ReconcilePod) error {
+	log.V(1).F().Info("Received ReconcilePod: %v", cmd)
+
 	switch cmd.cmd {
 	case reconcileAdd:
 		w.a.V(1).M(cmd.new).F().Info("Add Pod. %s/%s", cmd.new.Namespace, cmd.new.Name)
@@ -343,6 +347,17 @@ func (w *worker) normalize(c *chiV1.ClickHouseInstallation) *chiV1.ClickHouseIns
 }
 
 // ensureFinalizer
+// Finalizers are namespaced keys that tell Kubernetes to wait until specific conditions are
+// met before it fully deletes resources marked for deletion. Finalizers alert controllers to
+// clean up resources the deleted object owned
+//
+// When you tell Kubernetes to delete an object that has finalizers specified for it, the
+// Kubernetes API marks the object for deletion by populating
+// `.metadata.deletionTimestamp`, and returns a 202 status code (HTTP "Accepted"). The
+// target object remains in a terminating state while the control plane, or other components,
+// take the actions defined by the finalizers. After these actions are complete, the controller
+// removes the relevant finalizers from the target object. When the `metadata.finalizers`
+// field is empty, Kubernetes considers the deletion complete and deletes the object
 func (w *worker) ensureFinalizer(ctx context.Context, chi *chiV1.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -423,6 +438,10 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 	defer w.a.V(1).M(new).E().P()
 
 	if w.ensureFinalizer(context.Background(), new) {
+		// When a new ClickHouseInstallation first added to k8s, it doesn't have any finalizers,
+		// this step will install finalizer for this ClickHouseInstallation.
+		// At this time, k8s will notice this change and the new change is published to informer,
+		// which will be caught by the controller with `cmd=update`
 		w.a.M(new).F().Info("finalizer installed, let's restart reconcile cycle. CHI: %s/%s", new.Namespace, new.Name)
 		w.a.M(new).F().Info("---------------------------------------------------------------------")
 		return nil
@@ -719,6 +738,8 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 	}
 
 	objs := w.c.discovery(ctx, chi)
+
+	// Walk over the Added items in action plan, set the `reconcileAttributes` of hosts
 	ap.WalkAdded(
 		// Walk over added clusters
 		func(cluster *chiV1.Cluster) {
@@ -764,6 +785,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 		},
 	)
 
+	// Walk over Modified items in action plan, set the `reconcileAttributes` of hosts
 	ap.WalkModified(
 		func(cluster *chiV1.Cluster) {
 		},
@@ -1522,8 +1544,8 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 
 	statefulSet := host.DesiredStatefulSet
 
-	w.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
-	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
+	w.a.V(1).M(host).S().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
+	defer w.a.V(1).M(host).E().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).

@@ -124,6 +124,9 @@ func (c *Controller) addEventHandlersCHI(
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*chiV1.ClickHouseInstallation)
+
+			log.V(1).Info("AddFunc: %v", chi.YAML(chiV1.CopyCHIOptions{SkipStatus: true, SkipManagedFields: true}))
+
 			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
@@ -133,6 +136,9 @@ func (c *Controller) addEventHandlersCHI(
 		UpdateFunc: func(old, new interface{}) {
 			oldChi := old.(*chiV1.ClickHouseInstallation)
 			newChi := new.(*chiV1.ClickHouseInstallation)
+
+			log.V(1).Info("UpdateFunc\n, old: %v\n, new: %v", oldChi.YAML(chiV1.CopyCHIOptions{SkipStatus: true, SkipManagedFields: true}), newChi.YAML(chiV1.CopyCHIOptions{SkipStatus: true, SkipManagedFields: true}))
+
 			if !chop.Config().IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
@@ -141,6 +147,9 @@ func (c *Controller) addEventHandlersCHI(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*chiV1.ClickHouseInstallation)
+
+			log.V(1).Info("DeleteFunc: %v", chi.YAML(chiV1.CopyCHIOptions{SkipStatus: true, SkipManagedFields: true}))
+
 			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}

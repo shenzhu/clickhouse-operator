@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"gopkg.in/d4l3k/messagediff.v1"
 	"math"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -143,8 +144,8 @@ func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().P()
-	defer w.a.V(2).M(chi).E().P()
+	w.a.V(1).M(chi).S().P()
+	defer w.a.V(1).M(chi).E().P()
 
 	counters := chiV1.NewChiHostReconcileAttributesCounters()
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
@@ -175,8 +176,8 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().P()
-	defer w.a.V(2).M(chi).E().P()
+	w.a.V(1).M(chi).S().P()
+	defer w.a.V(1).M(chi).E().P()
 
 	// CHI common ConfigMap without added hosts
 	options := w.options()
@@ -227,8 +228,8 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chiV1.Cli
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().P()
-	defer w.a.V(2).M(chi).E().P()
+	w.a.V(1).M(chi).S().P()
+	defer w.a.V(1).M(chi).E().P()
 
 	// CHI ConfigMaps with update
 	return w.reconcileCHIConfigMapCommon(ctx, chi, nil)
@@ -412,8 +413,8 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 		return nil
 	}
 
-	w.a.V(2).M(cluster).S().P()
-	defer w.a.V(2).M(cluster).E().P()
+	w.a.V(1).M(cluster).S().P()
+	defer w.a.V(1).M(cluster).E().P()
 
 	// Add Cluster's Service
 	if service := w.task.creator.CreateServiceCluster(cluster); service != nil {
@@ -572,8 +573,8 @@ func (w *worker) reconcileShard(ctx context.Context, shard *chiV1.ChiShard) erro
 		return nil
 	}
 
-	w.a.V(2).M(shard).S().P()
-	defer w.a.V(2).M(shard).E().P()
+	w.a.V(1).M(shard).S().P()
+	defer w.a.V(1).M(shard).E().P()
 
 	// Add Shard's Service
 	service := w.task.creator.CreateServiceShard(shard)
@@ -597,13 +598,15 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		migrateTableOpts             *migrateTableOptions
 	)
 
+	log.V(1).Info("reconcileHost\n %s", string(debug.Stack()))
+
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.a.V(2).M(host).S().P()
-	defer w.a.V(2).M(host).E().P()
+	w.a.V(1).M(host).S().P()
+	defer w.a.V(1).M(host).E().P()
 
 	metricsHostReconcilesStarted(ctx)
 	startTime := time.Now()
@@ -621,6 +624,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
 
 	// Create artifacts
+	log.V(1).Info("Preparing artifacts: StatefulSet")
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 
 	if err := w.excludeHost(ctx, host); err != nil {
@@ -633,6 +637,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.completeQueries(ctx, host)
 
+	log.V(1).Info("Reconcile ConfigMap")
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
 		metricsHostReconcilesErrors(ctx)
 		w.a.V(1).
@@ -641,6 +646,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		return err
 	}
 
+	log.V(1).Info("Reconcile PVC")
 	errPVC := w.reconcilePVCs(ctx, host)
 	if errPVC == errLostPVCDeleted {
 		reconcileHostStatefulSetOpts = &reconcileHostStatefulSetOptions{
@@ -652,6 +658,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		}
 	}
 
+	log.V(1).Info("Reconcile StatefulSet")
 	if err := w.reconcileHostStatefulSet(ctx, host, reconcileHostStatefulSetOpts); err != nil {
 		metricsHostReconcilesErrors(ctx)
 		w.a.V(1).
@@ -745,8 +752,8 @@ func (w *worker) reconcileConfigMap(
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().P()
-	defer w.a.V(2).M(chi).E().P()
+	w.a.V(1).M(chi).S().P()
+	defer w.a.V(1).M(chi).E().P()
 
 	// Check whether this object already exists in k8s
 	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, true)
@@ -786,8 +793,8 @@ func (w *worker) reconcileService(ctx context.Context, chi *chiV1.ClickHouseInst
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().Info(service.Name)
-	defer w.a.V(2).M(chi).E().Info(service.Name)
+	w.a.V(1).M(chi).S().Info(service.Name)
+	defer w.a.V(1).M(chi).E().Info(service.Name)
 
 	// Check whether this object already exists
 	curService, err := w.c.getService(service)
@@ -853,8 +860,8 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost, 
 
 	newStatefulSet := host.DesiredStatefulSet
 
-	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
-	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
+	w.a.V(1).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
+	defer w.a.V(1).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 
 	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusSame {
 		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
